@@ -5,6 +5,7 @@ import android.view.View
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +38,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentContainerView
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
@@ -132,10 +154,179 @@ enum class AppDestinations(
 }
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(16.dp)) {
-        Text(text = "Welcome to BiteBook!", style = MaterialTheme.typography.headlineLarge)
-        Text(text = "Discover and share your favorite recipes.")
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    viewModel: BiteBookViewModel = viewModel()
+) {
+    val recipes by viewModel.recipes.collectAsState()
+
+    Column(modifier = modifier.fillMaxSize()) {
+        // Top Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.size(40.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(
+                    containerColor = Color(0xFFF08143)
+                )
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Default.Home, // Placeholder for the actual logo
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = Color.White
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.size(12.dp))
+            Text(
+                text = "BiteBook",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Text(
+            text = "Explore Recipes",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(recipes) { recipe ->
+                RecipeCard(recipe = recipe)
+            }
+        }
+    }
+}
+
+@Composable
+fun RecipeCard(recipe: Recipe) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                // Placeholder for Image
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .background(Color.LightGray)
+                ) {
+                    Text(
+                        "Image Placeholder",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color.Gray
+                    )
+                }
+
+                Card(
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .size(36.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.8f)
+                    )
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = Icons.Default.FavoriteBorder,
+                            contentDescription = "Like",
+                            modifier = Modifier.size(20.dp),
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = recipe.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = recipe.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(text = recipe.time, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        
+                        Spacer(modifier = Modifier.size(12.dp))
+                        
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(text = recipe.servings.toString(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(text = recipe.likes.toString(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        
+                        Spacer(modifier = Modifier.size(12.dp))
+                        
+                        Icon(
+                            Icons.Outlined.ChatBubbleOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
