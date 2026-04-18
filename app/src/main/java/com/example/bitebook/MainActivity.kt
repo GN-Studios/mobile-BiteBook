@@ -25,10 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -146,8 +148,13 @@ fun AddRecipeScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
-    val userRecipes = listOf("Pasta Carbonara", "Homemade Pizza", "Greek Salad", "Chocolate Brownies")
+fun ProfileScreen(
+    modifier: Modifier = Modifier,
+    viewModel: BiteBookViewModel = viewModel()
+) {
+    val userRecipes by viewModel.userRecipes.collectAsState()
+    val userName by viewModel.userName.collectAsState()
+    val userEmail by viewModel.userEmail.collectAsState()
 
     LazyColumn(modifier = modifier.padding(16.dp)) {
         item {
@@ -161,8 +168,8 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                     .padding(vertical = 8.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Name: John Doe", style = MaterialTheme.typography.bodyLarge)
-                    Text(text = "Email: john.doe@example.com", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "Name: $userName", style = MaterialTheme.typography.bodyLarge)
+                    Text(text = "Email: $userEmail", style = MaterialTheme.typography.bodyMedium)
                 }
             }
             
