@@ -1,4 +1,6 @@
 *.iml
+.env
+.bitebook/
 .gradle
 /local.properties
 /.idea/caches
@@ -9,6 +11,8 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+server/build/
+server/*firebase-adminsdk*.json
 /captures
 .externalNativeBuild
 .cxx

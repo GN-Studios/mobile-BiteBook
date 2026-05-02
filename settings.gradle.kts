@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BiteBook"
-include(":app")
+include(":app", ":server")
  
