@@ -12,7 +12,13 @@
     <fragment
         android:id="@+id/addRecipeFragment"
         android:name="com.example.bitebook.AddRecipeFragment"
-        android:label="Add Recipe" />
+        android:label="Add Recipe">
+        <argument
+            android:name="recipeId"
+            android:defaultValue="@null"
+            app:argType="string"
+            app:nullable="true" />
+    </fragment>
 
     <fragment
         android:id="@+id/profileFragment"

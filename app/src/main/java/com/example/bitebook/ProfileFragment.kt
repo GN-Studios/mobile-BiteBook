@@ -18,10 +18,18 @@ class ProfileFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setContent {
                 BiteBookTheme {
+                    val viewModel: BiteBookViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                     ProfileScreen(
                         onRecipeClick = { recipeId ->
                             val bundle = Bundle().apply { putString("recipeId", recipeId) }
                             findNavController().navigate(R.id.recipeDetailFragment, bundle)
+                        },
+                        onEditClick = { recipeId ->
+                            val bundle = Bundle().apply { putString("recipeId", recipeId) }
+                            findNavController().navigate(R.id.addRecipeFragment, bundle)
+                        },
+                        onDeleteClick = { recipeId ->
+                            viewModel.deleteRecipe(recipeId)
                         }
                     )
                 }

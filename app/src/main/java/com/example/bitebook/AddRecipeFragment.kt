@@ -9,7 +9,11 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.example.bitebook.ui.theme.BiteBookTheme
 
+import androidx.navigation.fragment.navArgs
+
 class AddRecipeFragment : Fragment() {
+    private val args: AddRecipeFragmentArgs by navArgs()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -19,6 +23,7 @@ class AddRecipeFragment : Fragment() {
             setContent {
                 BiteBookTheme {
                     AddRecipeScreen(
+                        recipeId = args.recipeId,
                         onCancel = { findNavController().navigateUp() },
                         onCreate = { recipe ->
                             findNavController().navigateUp()

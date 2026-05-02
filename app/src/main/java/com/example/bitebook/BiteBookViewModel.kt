@@ -85,7 +85,26 @@ class BiteBookViewModel : ViewModel() {
     private val _userEmail = MutableStateFlow("john.doe@example.com")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
+    private val _profileImageUri = MutableStateFlow<String?>(null)
+    val profileImageUri: StateFlow<String?> = _profileImageUri.asStateFlow()
+
+    fun updateProfile(name: String, imageUri: String?) {
+        _userName.value = name
+        _profileImageUri.value = imageUri
+    }
+
     fun addRecipe(recipe: Recipe) {
         _userRecipes.value = _userRecipes.value + recipe
+        _recipes.value = _recipes.value + recipe
+    }
+
+    fun updateRecipe(updatedRecipe: Recipe) {
+        _userRecipes.value = _userRecipes.value.map { if (it.id == updatedRecipe.id) updatedRecipe else it }
+        _recipes.value = _recipes.value.map { if (it.id == updatedRecipe.id) updatedRecipe else it }
+    }
+
+    fun deleteRecipe(recipeId: String) {
+        _userRecipes.value = _userRecipes.value.filter { it.id != recipeId }
+        _recipes.value = _recipes.value.filter { it.id != recipeId }
     }
 }

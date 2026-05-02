@@ -74,6 +74,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileUpload
@@ -188,6 +189,8 @@ fun HomeScreen(
     viewModel: BiteBookViewModel = viewModel()
 ) {
     val recipes by viewModel.recipes.collectAsState()
+    val userName by viewModel.userName.collectAsState()
+    val profileImageUri by viewModel.profileImageUri.collectAsState()
 
     Column(modifier = modifier.fillMaxSize()) {
         // Top Header
@@ -199,6 +202,8 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Profile Avatar instead of logo if preferred, or keep logo.
+                // Let's keep the logo but welcome the user.
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.size(40.dp),
@@ -207,20 +212,36 @@ fun HomeScreen(
                     )
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector = Icons.Default.Home, // Placeholder for the actual logo
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = Color.White
-                        )
+                        if (profileImageUri != null) {
+                            AsyncImage(
+                                model = profileImageUri,
+                                contentDescription = "Profile",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = userName.firstOrNull()?.toString() ?: "",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.size(12.dp))
-                Text(
-                    text = "BiteBook",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = "Hello, $userName!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "BiteBook",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
             }
 
             IconButton(
@@ -407,16 +428,31 @@ fun RecipeCard(
 @Composable
 fun AddRecipeScreen(
     modifier: Modifier = Modifier,
+    recipeId: String? = null,
     onCancel: () -> Unit = {},
     onCreate: (Recipe) -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var prepTime by remember { mutableStateOf("") }
-    var cookTime by remember { mutableStateOf("") }
-    var servings by remember { mutableStateOf("4") }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    val recipes by viewModel.recipes.collectAsState()
+    val existingRecipe = remember(recipeId, recipes) {
+        recipes.find { it.id == recipeId }
+    }
+
+    var title by remember { mutableStateOf(existingRecipe?.title ?: "") }
+    var description by remember { mutableStateOf(existingRecipe?.description ?: "") }
+    
+    // Parse time if editing
+    val initialPrepTime = remember(existingRecipe) {
+        existingRecipe?.time?.replace(" min", "")?.toIntOrNull()?.let { it / 2 }?.toString() ?: ""
+    }
+    val initialCookTime = remember(existingRecipe) {
+        existingRecipe?.time?.replace(" min", "")?.toIntOrNull()?.let { it - (it / 2) }?.toString() ?: ""
+    }
+
+    var prepTime by remember { mutableStateOf(initialPrepTime) }
+    var cookTime by remember { mutableStateOf(initialCookTime) }
+    var servings by remember { mutableStateOf(existingRecipe?.servings?.toString() ?: "4") }
+    var imageUri by remember { mutableStateOf<Uri?>(existingRecipe?.imageUrl?.let { Uri.parse(it) }) }
     
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -424,8 +460,24 @@ fun AddRecipeScreen(
         imageUri = uri
     }
 
-    val ingredients = remember { mutableStateListOf(Pair("", "")) }
-    val instructions = remember { mutableStateListOf("") }
+    val ingredients = remember { 
+        mutableStateListOf<Pair<String, String>>().apply {
+            if (existingRecipe != null) {
+                addAll(existingRecipe.ingredients)
+            } else {
+                add(Pair("", ""))
+            }
+        }
+    }
+    val instructions = remember { 
+        mutableStateListOf<String>().apply {
+            if (existingRecipe != null) {
+                addAll(existingRecipe.instructions)
+            } else {
+                add("")
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -441,7 +493,7 @@ fun AddRecipeScreen(
         ) {
             Spacer(modifier = Modifier.width(24.dp))
             Text(
-                text = "Create New Recipe",
+                text = if (recipeId == null) "Create New Recipe" else "Edit Recipe",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -670,8 +722,8 @@ fun AddRecipeScreen(
                         "${(prepTime.toIntOrNull() ?: 0) + (cookTime.toIntOrNull() ?: 0)} min"
                     } else "0 min"
                     
-                    val newRecipe = Recipe(
-                        id = java.util.UUID.randomUUID().toString(),
+                    val recipe = Recipe(
+                        id = recipeId ?: java.util.UUID.randomUUID().toString(),
                         title = title,
                         description = description,
                         imageUrl = imageUri?.toString(),
@@ -680,15 +732,20 @@ fun AddRecipeScreen(
                         ingredients = ingredients.toList(),
                         instructions = instructions.toList()
                     )
-                    viewModel.addRecipe(newRecipe)
-                    onCreate(newRecipe)
+                    
+                    if (recipeId == null) {
+                        viewModel.addRecipe(recipe)
+                    } else {
+                        viewModel.updateRecipe(recipe)
+                    }
+                    onCreate(recipe)
                 },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF08143)),
                 enabled = title.isNotBlank() && description.isNotBlank()
             ) {
-                Text("Create Recipe", color = Color.White)
+                Text(if (recipeId == null) "Create Recipe" else "Save Changes", color = Color.White)
             }
         }
         
@@ -700,10 +757,23 @@ fun AddRecipeScreen(
 fun ProfileScreen(
     modifier: Modifier = Modifier,
     onRecipeClick: (String) -> Unit = {},
+    onEditClick: (String) -> Unit = {},
+    onDeleteClick: (String) -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
     val userRecipes by viewModel.userRecipes.collectAsState()
     val userName by viewModel.userName.collectAsState()
+    val profileImageUri by viewModel.profileImageUri.collectAsState()
+    
+    var isEditingProfile by remember { mutableStateOf(false) }
+    var editedName by remember { mutableStateOf(userName) }
+    var editedImageUri by remember { mutableStateOf<Uri?>(profileImageUri?.let { Uri.parse(it) }) }
+
+    val profileImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        editedImageUri = uri
+    }
 
     Column(
         modifier = modifier
@@ -723,46 +793,116 @@ fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(Color(0xFFF08143), CircleShape),
+                        .clip(CircleShape)
+                        .background(Color(0xFFF08143))
+                        .clickable(enabled = isEditingProfile) {
+                            profileImagePickerLauncher.launch("image/*")
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = userName.firstOrNull()?.toString() ?: "",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (isEditingProfile) {
+                        if (editedImageUri != null) {
+                            AsyncImage(
+                                model = editedImageUri,
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Default.AddCircleOutline, contentDescription = "Add Photo", tint = Color.White)
+                        }
+                    } else if (profileImageUri != null) {
+                        AsyncImage(
+                            model = profileImageUri,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            text = userName.firstOrNull()?.toString() ?: "",
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column {
-                    Text(
-                        text = userName,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${userRecipes.size} recipes",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                    )
+                    if (isEditingProfile) {
+                        OutlinedTextField(
+                            value = editedName,
+                            onValueChange = { editedName = it },
+                            label = { Text("Name") },
+                            modifier = Modifier.width(150.dp),
+                            singleLine = true
+                        )
+                    } else {
+                        Text(
+                            text = userName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${userRecipes.size} recipes",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
+                        )
+                    }
                 }
             }
 
-            // Logout Button
-            IconButton(
-                onClick = { /* TODO: Logout */ },
-                modifier = Modifier
-                    .border(1.dp, Color.LightGray, CircleShape)
-                    .size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Logout,
-                    contentDescription = "Logout",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(20.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isEditingProfile) {
+                    IconButton(onClick = {
+                        viewModel.updateProfile(editedName, editedImageUri?.toString())
+                        isEditingProfile = false
+                    }) {
+                        Icon(Icons.Default.Check, contentDescription = "Save", tint = Color(0xFF4CAF50))
+                    }
+                    IconButton(onClick = {
+                        isEditingProfile = false
+                    }) {
+                        Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color(0xFFF44336))
+                    }
+                } else {
+                    IconButton(
+                        onClick = { 
+                            editedName = userName
+                            editedImageUri = profileImageUri?.let { Uri.parse(it) }
+                            isEditingProfile = true 
+                        },
+                        modifier = Modifier
+                            .border(1.dp, Color.LightGray, CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Profile",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Logout Button
+                IconButton(
+                    onClick = { /* TODO: Logout */ },
+                    modifier = Modifier
+                        .border(1.dp, Color.LightGray, CircleShape)
+                        .size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Logout,
+                        contentDescription = "Logout",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -783,8 +923,8 @@ fun ProfileScreen(
                 RecipeCard(
                     recipe = recipe,
                     onClick = { onRecipeClick(recipe.id) },
-                    onEdit = { /* TODO: Edit */ },
-                    onDelete = { /* TODO: Delete */ }
+                    onEdit = { onEditClick(recipe.id) },
+                    onDelete = { onDeleteClick(recipe.id) }
                 )
             }
         }
