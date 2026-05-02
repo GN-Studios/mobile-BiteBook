@@ -1,0 +1,7 @@
+.bitebook/
+.gradle/
+.gradle-local/
+.idea/
+.env
+.env.local
+app/*firebase-adminsdk*.json

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1081691949702",
+    "project_id": "bitebook-c2c62",
+    "storage_bucket": "bitebook-c2c62.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1081691949702:android:10f48a756dd6d6cf3f9f07",
+        "android_client_info": {
+          "package_name": "com.example.bitebook"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOqvVJcsSABDCKkK62AqDStgrAqcw-IaE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
