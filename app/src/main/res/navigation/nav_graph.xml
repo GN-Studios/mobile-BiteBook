@@ -18,4 +18,13 @@
         android:id="@+id/profileFragment"
         android:name="com.example.bitebook.ProfileFragment"
         android:label="Profile" />
+
+    <fragment
+        android:id="@+id/recipeDetailFragment"
+        android:name="com.example.bitebook.RecipeDetailFragment"
+        android:label="Recipe Detail">
+        <argument
+            android:name="recipeId"
+            app:argType="string" />
+    </fragment>
 </navigation>

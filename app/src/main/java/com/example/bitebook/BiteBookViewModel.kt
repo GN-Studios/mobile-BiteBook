@@ -12,7 +12,8 @@ data class Recipe(
     val imageUrl: String? = null,
     val time: String,
     val servings: Int,
-    val likes: Int
+    val ingredients: List<Pair<String, String>> = emptyList(),
+    val instructions: List<String> = emptyList()
 )
 
 class BiteBookViewModel : ViewModel() {
@@ -25,7 +26,8 @@ class BiteBookViewModel : ViewModel() {
                 null,
                 "45 min",
                 4,
-                41
+                ingredients = listOf("1" to "Pizza dough", "1/2 cup" to "Tomato sauce", "200g" to "Fresh mozzarella", "Handful" to "Fresh basil"),
+                instructions = listOf("Preheat oven to 250°C", "Roll out the dough", "Spread sauce and add cheese", "Bake for 10-12 minutes")
             ),
             Recipe(
                 "2",
@@ -34,7 +36,8 @@ class BiteBookViewModel : ViewModel() {
                 null,
                 "30 min",
                 2,
-                25
+                ingredients = listOf("200g" to "Spaghetti", "100g" to "Pancetta", "2" to "Large eggs", "50g" to "Pecorino Romano"),
+                instructions = listOf("Boil pasta", "Fry pancetta", "Mix eggs and cheese", "Combine all with a splash of pasta water")
             ),
             Recipe(
                 "3",
@@ -43,14 +46,38 @@ class BiteBookViewModel : ViewModel() {
                 null,
                 "15 min",
                 1,
-                12
+                ingredients = listOf("1" to "Cucumber", "2" to "Tomatoes", "50g" to "Feta cheese", "10" to "Kalamata olives"),
+                instructions = listOf("Chop vegetables", "Combine in a bowl", "Add olives and feta", "Drizzle with olive oil")
             )
         )
     )
     val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
 
-    private val _userRecipes = MutableStateFlow(listOf("Pasta Carbonara", "Homemade Pizza", "Greek Salad", "Chocolate Brownies"))
-    val userRecipes: StateFlow<List<String>> = _userRecipes.asStateFlow()
+    private val _userRecipes = MutableStateFlow(
+        listOf(
+            Recipe(
+                "2",
+                "Pasta Carbonara",
+                "Creamy pasta with pancetta, egg, and parmesan cheese.",
+                null,
+                "30 min",
+                2,
+                ingredients = listOf("200g" to "Spaghetti", "100g" to "Pancetta", "2" to "Large eggs", "50g" to "Pecorino Romano"),
+                instructions = listOf("Boil pasta", "Fry pancetta", "Mix eggs and cheese", "Combine all with a splash of pasta water")
+            ),
+            Recipe(
+                "3",
+                "Greek Salad",
+                "Fresh cucumber, tomatoes, olives, and feta cheese with olive oil.",
+                null,
+                "15 min",
+                1,
+                ingredients = listOf("1" to "Cucumber", "2" to "Tomatoes", "50g" to "Feta cheese", "10" to "Kalamata olives"),
+                instructions = listOf("Chop vegetables", "Combine in a bowl", "Add olives and feta", "Drizzle with olive oil")
+            )
+        )
+    )
+    val userRecipes: StateFlow<List<Recipe>> = _userRecipes.asStateFlow()
 
     private val _userName = MutableStateFlow("John Doe")
     val userName: StateFlow<String> = _userName.asStateFlow()
@@ -58,7 +85,7 @@ class BiteBookViewModel : ViewModel() {
     private val _userEmail = MutableStateFlow("john.doe@example.com")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
-    fun addRecipe(recipe: String) {
+    fun addRecipe(recipe: Recipe) {
         _userRecipes.value = _userRecipes.value + recipe
     }
 }

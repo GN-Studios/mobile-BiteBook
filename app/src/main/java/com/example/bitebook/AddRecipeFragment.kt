@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import com.example.bitebook.ui.theme.BiteBookTheme
 
 class AddRecipeFragment : Fragment() {
@@ -17,7 +18,12 @@ class AddRecipeFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setContent {
                 BiteBookTheme {
-                    AddRecipeScreen()
+                    AddRecipeScreen(
+                        onCancel = { findNavController().navigateUp() },
+                        onCreate = { recipe ->
+                            findNavController().navigateUp()
+                        }
+                    )
                 }
             }
         }

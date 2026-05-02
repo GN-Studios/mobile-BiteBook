@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import com.example.bitebook.ui.theme.BiteBookTheme
 
 class ProfileFragment : Fragment() {
@@ -17,7 +18,12 @@ class ProfileFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setContent {
                 BiteBookTheme {
-                    ProfileScreen()
+                    ProfileScreen(
+                        onRecipeClick = { recipeId ->
+                            val bundle = Bundle().apply { putString("recipeId", recipeId) }
+                            findNavController().navigate(R.id.recipeDetailFragment, bundle)
+                        }
+                    )
                 }
             }
         }
