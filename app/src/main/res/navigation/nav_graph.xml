@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.example.bitebook.HomeFragment"
+        android:label="Home" />
+
+    <fragment
+        android:id="@+id/addRecipeFragment"
+        android:name="com.example.bitebook.AddRecipeFragment"
+        android:label="Add Recipe">
+        <argument
+            android:name="recipeId"
+            android:defaultValue="@null"
+            app:argType="string"
+            app:nullable="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.bitebook.ProfileFragment"
+        android:label="Profile" />
+
+    <fragment
+        android:id="@+id/recipeDetailFragment"
+        android:name="com.example.bitebook.RecipeDetailFragment"
+        android:label="Recipe Detail">
+        <argument
+            android:name="recipeId"
+            app:argType="string" />
+    </fragment>
+</navigation>
