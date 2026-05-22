@@ -2,29 +2,55 @@ package com.example.bitebook
 
 import android.os.Bundle
 import android.view.View
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,9 +60,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -46,48 +74,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material3.IconButton
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.AddCircleOutline
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.mutableStateListOf
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.navOptions
 import coil.compose.AsyncImage
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
@@ -126,36 +123,41 @@ fun BiteBookApp() {
         }
     }
 
+    val showNavigation = currentDestinationId != null &&
+            currentDestinationId != R.id.loginFragment &&
+            currentDestinationId != R.id.signUpFragment
+
     NavigationSuiteScaffold(
         navigationSuiteItems = {
-            AppDestinations.entries.forEach { destination ->
-                item(
-                    icon = {
-                        Icon(
-                            destination.icon,
-                            contentDescription = destination.label
-                        )
-                    },
-                    label = { Text(destination.label) },
-                    selected = currentDestinationId == destination.id,
-                    onClick = {
-                        val controller = navController ?: return@item
-                        val destId = destination.id
-                        
-                        // Using the explicit member function to avoid ambiguity with type-safe routes
-                        controller.navigate(
-                            destId,
-                            null,
-                            navOptions {
-                                popUpTo(controller.graph.startDestinationId) {
-                                    saveState = true
+            if (showNavigation) {
+                AppDestinations.entries.forEach { destination ->
+                    item(
+                        icon = {
+                            Icon(
+                                destination.icon,
+                                contentDescription = destination.label
+                            )
+                        },
+                        label = { Text(destination.label) },
+                        selected = currentDestinationId == destination.id,
+                        onClick = {
+                            val controller = navController ?: return@item
+                            val destId = destination.id
+
+                            controller.navigate(
+                                destId,
+                                null,
+                                navOptions {
+                                    popUpTo(controller.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        )
-                    }
-                )
+                            )
+                        }
+                    )
+                }
             }
         }
     ) {
@@ -188,6 +190,7 @@ enum class AppDestinations(
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onRecipeClick: (String) -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
     val recipes = viewModel.recipes.collectAsLazyPagingItems()
@@ -221,6 +224,8 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Profile Avatar instead of logo if preferred, or keep logo.
+                // Let's keep the logo but welcome the user.
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.size(40.dp),
@@ -246,7 +251,7 @@ fun HomeScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.size(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "Hello, $userName!",
@@ -262,7 +267,7 @@ fun HomeScreen(
             }
 
             IconButton(
-                onClick = { viewModel.logout() },
+                onClick = onLogout,
                 modifier = Modifier
                     .border(1.dp, Color.LightGray, CircleShape)
                     .size(40.dp)
@@ -362,7 +367,7 @@ fun RecipeCard(
                     }
                 }
 
-                // Edit and Delete Overlays
+                // Edit and Delete Overlays (Only shown if callbacks are provided)
                 if (onEdit != null || onDelete != null) {
                     Row(
                         modifier = Modifier
@@ -460,6 +465,8 @@ fun RecipeCard(
                             )
                         }
                     }
+
+
                 }
             }
         }
@@ -477,14 +484,14 @@ fun AddRecipeScreen(
     viewModel: BiteBookViewModel = viewModel()
 ) {
     val userRecipes = viewModel.userRecipes.collectAsLazyPagingItems()
-    
+
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var prepTime by remember { mutableStateOf("") }
     var cookTime by remember { mutableStateOf("") }
     var servings by remember { mutableStateOf("4") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    
+
     val ingredients = remember { mutableStateListOf<Ingredient>(Ingredient("", "")) }
     val instructions = remember { mutableStateListOf<String>("") }
 
@@ -630,7 +637,7 @@ fun AddRecipeScreen(
         // Prep Time, Cook Time, Servings
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Prep (min)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                Text(text = "Prep Time (min)", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = prepTime,
                     onValueChange = { prepTime = it },
@@ -640,7 +647,7 @@ fun AddRecipeScreen(
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Cook (min)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                Text(text = "Cook Time (min)", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = cookTime,
                     onValueChange = { cookTime = it },
@@ -783,7 +790,7 @@ fun AddRecipeScreen(
                             servings = servings.toIntOrNull() ?: 1,
                             ingredients = ingredients.toList(),
                             instructions = instructions.toList(),
-                            onSuccess = { 
+                            onSuccess = {
                                 isSaving = false
                                 onCreate()
                             },
@@ -803,7 +810,7 @@ fun AddRecipeScreen(
                             servings = servings.toIntOrNull() ?: 1,
                             ingredients = ingredients.toList(),
                             instructions = instructions.toList(),
-                            onSuccess = { 
+                            onSuccess = {
                                 isSaving = false
                                 onUpdate()
                             },
@@ -841,6 +848,7 @@ fun ProfileScreen(
     onRecipeClick: (String) -> Unit = {},
     onEditClick: (String) -> Unit = {},
     onDeleteClick: (String) -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
     val userRecipes = viewModel.userRecipes.collectAsLazyPagingItems()
@@ -879,7 +887,7 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(Color(0xFFFAF9F6))
     ) {
-        // ... (Profile Section remains same)
+        // Top Profile Section
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -990,7 +998,7 @@ fun ProfileScreen(
 
                 // Logout Button
                 IconButton(
-                    onClick = { viewModel.logout() },
+                    onClick = onLogout,
                     modifier = Modifier
                         .border(1.dp, Color.LightGray, CircleShape)
                         .size(40.dp)
@@ -1015,7 +1023,7 @@ fun ProfileScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(
@@ -1149,7 +1157,7 @@ fun RecipeDetailScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Stats and Engagement
+            // Time and Servings
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

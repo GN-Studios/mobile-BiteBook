@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.example.bitebook.ui.theme.BiteBookTheme
 
@@ -33,6 +34,15 @@ class ProfileFragment : Fragment() {
                         },
                         onDeleteClick = { recipeId ->
                             viewModel.deleteRecipe(recipeId)
+                        },
+                        onLogout = {
+                            findNavController().navigate(
+                                R.id.loginFragment,
+                                null,
+                                NavOptions.Builder()
+                                    .setPopUpTo(R.id.nav_graph, true)
+                                    .build()
+                            )
                         }
                     )
                 }
