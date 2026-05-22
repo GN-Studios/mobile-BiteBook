@@ -1,83 +1,37 @@
 package com.example.bitebook
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import com.example.bitebook.api.RetrofitInstance
+import com.example.bitebook.data.Ingredient
+import com.example.bitebook.data.RecipeRequest
+import com.example.bitebook.data.RecipeResponse
+import com.example.bitebook.data.RecipePagingSource
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-data class Recipe(
-    val id: String,
-    val title: String,
-    val description: String,
-    val imageUrl: String? = null,
-    val time: String,
-    val servings: Int,
-    val ingredients: List<Pair<String, String>> = emptyList(),
-    val instructions: List<String> = emptyList()
-)
+import kotlinx.coroutines.launch
 
 class BiteBookViewModel : ViewModel() {
-    private val _recipes = MutableStateFlow(
-        listOf(
-            Recipe(
-                "1",
-                "Classic Margherita Pizza",
-                "A traditional Italian pizza with fresh mozzarella, tomatoes, and basil on a crispy...",
-                null,
-                "45 min",
-                4,
-                ingredients = listOf("1" to "Pizza dough", "1/2 cup" to "Tomato sauce", "200g" to "Fresh mozzarella", "Handful" to "Fresh basil"),
-                instructions = listOf("Preheat oven to 250°C", "Roll out the dough", "Spread sauce and add cheese", "Bake for 10-12 minutes")
-            ),
-            Recipe(
-                "2",
-                "Pasta Carbonara",
-                "Creamy pasta with pancetta, egg, and parmesan cheese.",
-                null,
-                "30 min",
-                2,
-                ingredients = listOf("200g" to "Spaghetti", "100g" to "Pancetta", "2" to "Large eggs", "50g" to "Pecorino Romano"),
-                instructions = listOf("Boil pasta", "Fry pancetta", "Mix eggs and cheese", "Combine all with a splash of pasta water")
-            ),
-            Recipe(
-                "3",
-                "Greek Salad",
-                "Fresh cucumber, tomatoes, olives, and feta cheese with olive oil.",
-                null,
-                "15 min",
-                1,
-                ingredients = listOf("1" to "Cucumber", "2" to "Tomatoes", "50g" to "Feta cheese", "10" to "Kalamata olives"),
-                instructions = listOf("Chop vegetables", "Combine in a bowl", "Add olives and feta", "Drizzle with olive oil")
-            )
-        )
-    )
-    val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
+    private val apiService = RetrofitInstance.api
 
-    private val _userRecipes = MutableStateFlow(
-        listOf(
-            Recipe(
-                "2",
-                "Pasta Carbonara",
-                "Creamy pasta with pancetta, egg, and parmesan cheese.",
-                null,
-                "30 min",
-                2,
-                ingredients = listOf("200g" to "Spaghetti", "100g" to "Pancetta", "2" to "Large eggs", "50g" to "Pecorino Romano"),
-                instructions = listOf("Boil pasta", "Fry pancetta", "Mix eggs and cheese", "Combine all with a splash of pasta water")
-            ),
-            Recipe(
-                "3",
-                "Greek Salad",
-                "Fresh cucumber, tomatoes, olives, and feta cheese with olive oil.",
-                null,
-                "15 min",
-                1,
-                ingredients = listOf("1" to "Cucumber", "2" to "Tomatoes", "50g" to "Feta cheese", "10" to "Kalamata olives"),
-                instructions = listOf("Chop vegetables", "Combine in a bowl", "Add olives and feta", "Drizzle with olive oil")
-            )
-        )
-    )
-    val userRecipes: StateFlow<List<Recipe>> = _userRecipes.asStateFlow()
+    val recipes: Flow<PagingData<RecipeResponse>> = Pager(
+        config = PagingConfig(pageSize = 10),
+        pagingSourceFactory = { RecipePagingSource(apiService) }
+    ).flow.cachedIn(viewModelScope)
+
+    private val _userId = MutableStateFlow("698fc782633cc499a80d94c3") // Hardcoded for now
+    val userId: StateFlow<String> = _userId.asStateFlow()
+
+    val userRecipes: Flow<PagingData<RecipeResponse>> = Pager(
+        config = PagingConfig(pageSize = 10),
+        pagingSourceFactory = { RecipePagingSource(apiService, _userId.value) }
+    ).flow.cachedIn(viewModelScope)
 
     private val _userName = MutableStateFlow("John Doe")
     val userName: StateFlow<String> = _userName.asStateFlow()
@@ -88,23 +42,115 @@ class BiteBookViewModel : ViewModel() {
     private val _profileImageUri = MutableStateFlow<String?>(null)
     val profileImageUri: StateFlow<String?> = _profileImageUri.asStateFlow()
 
+    private val _selectedRecipe = MutableStateFlow<RecipeResponse?>(null)
+    val selectedRecipe: StateFlow<RecipeResponse?> = _selectedRecipe.asStateFlow()
+
+    init {
+        // loadUserRecipes() no longer needed as userRecipes is now a Paging Flow
+    }
+
+    fun getRecipeById(id: String) {
+        viewModelScope.launch {
+            try {
+                _selectedRecipe.value = apiService.getRecipeById(id)
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
+    }
+
+    private fun loadUserRecipes() {
+        // Re-triggering of paging data can be handled by UI or by refreshing the flow if needed
+    }
+
     fun updateProfile(name: String, imageUri: String?) {
         _userName.value = name
         _profileImageUri.value = imageUri
     }
 
-    fun addRecipe(recipe: Recipe) {
-        _userRecipes.value = _userRecipes.value + recipe
-        _recipes.value = _recipes.value + recipe
+    fun logout() {
+        // TODO: Implement actual logout (clear tokens, navigate to login)
+        _userId.value = ""
+        _userName.value = ""
+        _userEmail.value = ""
+        _profileImageUri.value = null
     }
 
-    fun updateRecipe(updatedRecipe: Recipe) {
-        _userRecipes.value = _userRecipes.value.map { if (it.id == updatedRecipe.id) updatedRecipe else it }
-        _recipes.value = _recipes.value.map { if (it.id == updatedRecipe.id) updatedRecipe else it }
+    fun addRecipe(
+        title: String,
+        description: String,
+        image: String?,
+        prepTime: Int,
+        cookTime: Int,
+        servings: Int,
+        ingredients: List<Ingredient>,
+        instructions: List<String>,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val request = RecipeRequest(
+                    title = title,
+                    description = description,
+                    image = image,
+                    prepTime = prepTime,
+                    cookTime = cookTime,
+                    servings = servings,
+                    ingredients = ingredients,
+                    instructions = instructions,
+                    userId = _userId.value
+                )
+                apiService.createRecipe(request)
+                loadUserRecipes()
+                onSuccess()
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
+    }
+
+    fun updateRecipe(
+        id: String,
+        title: String,
+        description: String,
+        image: String?,
+        prepTime: Int,
+        cookTime: Int,
+        servings: Int,
+        ingredients: List<Ingredient>,
+        instructions: List<String>,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val request = RecipeRequest(
+                    title = title,
+                    description = description,
+                    image = image,
+                    prepTime = prepTime,
+                    cookTime = cookTime,
+                    servings = servings,
+                    ingredients = ingredients,
+                    instructions = instructions,
+                    userId = _userId.value
+                )
+                apiService.updateRecipe(id, request)
+                loadUserRecipes()
+                onSuccess()
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
     }
 
     fun deleteRecipe(recipeId: String) {
-        _userRecipes.value = _userRecipes.value.filter { it.id != recipeId }
-        _recipes.value = _recipes.value.filter { it.id != recipeId }
+        viewModelScope.launch {
+            try {
+                apiService.deleteRecipe(recipeId)
+                loadUserRecipes()
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
     }
 }
