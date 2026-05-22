@@ -6,10 +6,14 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.example.bitebook.ui.theme.BiteBookTheme
 
 class HomeFragment : Fragment() {
+    private val viewModel: BiteBookViewModel by activityViewModels()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -19,9 +23,19 @@ class HomeFragment : Fragment() {
             setContent {
                 BiteBookTheme {
                     HomeScreen(
+                        viewModel = viewModel,
                         onRecipeClick = { recipeId ->
                             val bundle = Bundle().apply { putString("recipeId", recipeId) }
                             findNavController().navigate(R.id.recipeDetailFragment, bundle)
+                        },
+                        onLogout = {
+                            findNavController().navigate(
+                                R.id.loginFragment,
+                                null,
+                                NavOptions.Builder()
+                                    .setPopUpTo(R.id.nav_graph, true)
+                                    .build()
+                            )
                         }
                     )
                 }
