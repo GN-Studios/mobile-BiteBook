@@ -27,8 +27,9 @@ class RecipePagingSource(
             LoadResult.Page(
                 data = recipes,
                 prevKey = if (nextPageNumber == 1) null else nextPageNumber - 1,
-                // For user-specific recipes, we assume all are returned in one go for now
-                nextKey = if (userId != null || recipes.isEmpty()) null else nextPageNumber + 1
+                // Stop paging if we received fewer items than requested (standard end of list check)
+                // or if we're fetching user-specific recipes which aren't paginated yet.
+                nextKey = if (userId != null || recipes.isEmpty() || recipes.size < params.loadSize) null else nextPageNumber + 1
             )
         } catch (e: Exception) {
             LoadResult.Error(e)

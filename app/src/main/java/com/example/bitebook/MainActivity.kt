@@ -460,21 +460,6 @@ fun RecipeCard(
                             )
                         }
                     }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Favorite,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = Color(0xFFF08143)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${recipe.likesCount ?: 0}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
-                        )
-                    }
                 }
             }
         }
@@ -487,6 +472,7 @@ fun AddRecipeScreen(
     recipeId: String? = null,
     onCancel: () -> Unit = {},
     onCreate: () -> Unit = {},
+    onUpdate: () -> Unit = {},
     onError: (String) -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
@@ -819,7 +805,7 @@ fun AddRecipeScreen(
                             instructions = instructions.toList(),
                             onSuccess = { 
                                 isSaving = false
-                                onCancel() 
+                                onUpdate()
                             },
                             onError = { e ->
                                 isSaving = false
@@ -1195,38 +1181,6 @@ fun RecipeDetailScreen(
                         Text(
                             text = "${nonNullRecipe.servings} Servings",
                             style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
-                // Likes and Comments
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${nonNullRecipe.likesCount ?: 0}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.ChatBubbleOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${nonNullRecipe.commentsCount ?: 0}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
                         )
                     }
                 }

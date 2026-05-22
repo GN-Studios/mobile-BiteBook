@@ -27,7 +27,11 @@ class BiteBookViewModel : ViewModel() {
 
     val recipes: Flow<PagingData<RecipeResponse>> = _refreshTrigger.flatMapLatest {
         Pager(
-            config = PagingConfig(pageSize = 10),
+            config = PagingConfig(
+                pageSize = 10,
+                initialLoadSize = 10, // Ensure initial load matches page size to avoid duplicates
+                enablePlaceholders = false
+            ),
             pagingSourceFactory = { RecipePagingSource(apiService) }
         ).flow
     }.cachedIn(viewModelScope)
@@ -37,7 +41,11 @@ class BiteBookViewModel : ViewModel() {
 
     val userRecipes: Flow<PagingData<RecipeResponse>> = _refreshTrigger.flatMapLatest {
         Pager(
-            config = PagingConfig(pageSize = 10),
+            config = PagingConfig(
+                pageSize = 10,
+                initialLoadSize = 10,
+                enablePlaceholders = false
+            ),
             pagingSourceFactory = { RecipePagingSource(apiService, _userId.value) }
         ).flow
     }.cachedIn(viewModelScope)
@@ -61,7 +69,22 @@ class BiteBookViewModel : ViewModel() {
     fun getRecipeById(id: String) {
         viewModelScope.launch {
             try {
-                _selectedRecipe.value = apiService.getRecipeById(id)
+                val response = apiService.getRecipeById(id)
+                _selectedRecipe.value = response.recipe ?: RecipeResponse(
+                    _id = response._id ?: "",
+                    title = response.title ?: "",
+                    description = response.description ?: "",
+                    image = response.image,
+                    prepTime = response.prepTime ?: 0,
+                    cookTime = response.cookTime ?: 0,
+                    servings = response.servings ?: 0,
+                    ingredients = response.ingredients ?: emptyList(),
+                    instructions = response.instructions ?: emptyList(),
+                    userId = response.userId,
+                    author = response.author,
+                    createdAt = response.createdAt,
+                    updatedAt = response.updatedAt
+                )
             } catch (e: Exception) {
                 // Handle error
             }

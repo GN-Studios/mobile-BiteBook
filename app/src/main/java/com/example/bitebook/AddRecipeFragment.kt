@@ -32,10 +32,19 @@ class AddRecipeFragment : Fragment() {
                         onCancel = { findNavController().navigateUp() },
                         onError = { message ->
                             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                            Log.e("AddRecipeFragment", message)
                         },
                         onCreate = {
                             Toast.makeText(requireContext(), "Recipe Created!", Toast.LENGTH_SHORT).show()
-                            findNavController().navigateUp()
+                            findNavController().navigate(R.id.homeFragment, null, navOptions {
+                                popUpTo(R.id.nav_graph) { inclusive = true }
+                            })
+                        },
+                        onUpdate = {
+                            Toast.makeText(requireContext(), "Recipe Updated!", Toast.LENGTH_SHORT).show()
+                            findNavController().navigate(R.id.profileFragment, null, navOptions {
+                                popUpTo(R.id.nav_graph) { inclusive = true }
+                            })
                         }
                     )
                 }
