@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -30,11 +31,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -83,6 +88,7 @@ import coil.compose.AsyncImage
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
@@ -188,6 +194,23 @@ fun HomeScreen(
     val userName by viewModel.userName.collectAsState()
     val profileImageUri by viewModel.profileImageUri.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.triggerRefresh()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.triggerRefresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         // ... (Header remains mostly same, but maybe uses first letter of userName)
         Row(
@@ -260,22 +283,31 @@ fun HomeScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(
-                count = recipes.itemCount,
-                key = recipes.itemKey { it._id },
-                contentType = recipes.itemContentType { "recipe" }
-            ) { index ->
-                val recipe = recipes[index]
-                if (recipe != null) {
-                    RecipeCard(
-                        recipe = recipe,
-                        onClick = { onRecipeClick(recipe._id) }
-                    )
+        if (recipes.loadState.refresh is LoadState.Loading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFFF08143))
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(
+                    count = recipes.itemCount,
+                    key = recipes.itemKey { it._id },
+                    contentType = recipes.itemContentType { "recipe" }
+                ) { index ->
+                    val recipe = recipes[index]
+                    if (recipe != null) {
+                        RecipeCard(
+                            recipe = recipe,
+                            onClick = { onRecipeClick(recipe._id) }
+                        )
+                    }
                 }
             }
         }
@@ -454,7 +486,8 @@ fun AddRecipeScreen(
     modifier: Modifier = Modifier,
     recipeId: String? = null,
     onCancel: () -> Unit = {},
-    onCreate: (RecipeResponse) -> Unit = {},
+    onCreate: () -> Unit = {},
+    onError: (String) -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
     val userRecipes = viewModel.userRecipes.collectAsLazyPagingItems()
@@ -514,6 +547,8 @@ fun AddRecipeScreen(
     ) { uri: Uri? ->
         imageUri = uri
     }
+
+    var isSaving by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -751,6 +786,7 @@ fun AddRecipeScreen(
             }
             Button(
                 onClick = {
+                    isSaving = true
                     if (recipeId == null) {
                         viewModel.addRecipe(
                             title = title,
@@ -762,8 +798,12 @@ fun AddRecipeScreen(
                             ingredients = ingredients.toList(),
                             instructions = instructions.toList(),
                             onSuccess = { 
-                                // We don't have the full RecipeResponse yet, but we can pass a dummy or trigger callback
-                                onCancel() 
+                                isSaving = false
+                                onCreate()
+                            },
+                            onError = { e ->
+                                isSaving = false
+                                onError(e.message ?: "Failed to save recipe")
                             }
                         )
                     } else {
@@ -777,16 +817,31 @@ fun AddRecipeScreen(
                             servings = servings.toIntOrNull() ?: 1,
                             ingredients = ingredients.toList(),
                             instructions = instructions.toList(),
-                            onSuccess = { onCancel() }
+                            onSuccess = { 
+                                isSaving = false
+                                onCancel() 
+                            },
+                            onError = { e ->
+                                isSaving = false
+                                onError(e.message ?: "Failed to update recipe")
+                            }
                         )
                     }
                 },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF08143)),
-                enabled = title.isNotBlank() && description.isNotBlank()
+                enabled = title.isNotBlank() && description.isNotBlank() && !isSaving
             ) {
-                Text(if (recipeId == null) "Create Recipe" else "Save Changes", color = Color.White)
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(if (recipeId == null) "Create Recipe" else "Save Changes", color = Color.White)
+                }
             }
         }
         
@@ -809,6 +864,23 @@ fun ProfileScreen(
     var isEditingProfile by remember { mutableStateOf(false) }
     var editedName by remember { mutableStateOf(userName) }
     var editedImageUri by remember { mutableStateOf<Uri?>(profileImageUri?.let { Uri.parse(it) }) }
+
+    LaunchedEffect(Unit) {
+        viewModel.triggerRefresh()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.triggerRefresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val profileImagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()

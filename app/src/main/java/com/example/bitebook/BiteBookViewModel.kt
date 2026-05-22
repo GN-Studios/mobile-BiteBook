@@ -15,23 +15,32 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BiteBookViewModel : ViewModel() {
     private val apiService = RetrofitInstance.api
 
-    val recipes: Flow<PagingData<RecipeResponse>> = Pager(
-        config = PagingConfig(pageSize = 10),
-        pagingSourceFactory = { RecipePagingSource(apiService) }
-    ).flow.cachedIn(viewModelScope)
+    private val _refreshTrigger = MutableStateFlow(System.currentTimeMillis())
+
+    val recipes: Flow<PagingData<RecipeResponse>> = _refreshTrigger.flatMapLatest {
+        Pager(
+            config = PagingConfig(pageSize = 10),
+            pagingSourceFactory = { RecipePagingSource(apiService) }
+        ).flow
+    }.cachedIn(viewModelScope)
 
     private val _userId = MutableStateFlow("698fc782633cc499a80d94c3") // Hardcoded for now
     val userId: StateFlow<String> = _userId.asStateFlow()
 
-    val userRecipes: Flow<PagingData<RecipeResponse>> = Pager(
-        config = PagingConfig(pageSize = 10),
-        pagingSourceFactory = { RecipePagingSource(apiService, _userId.value) }
-    ).flow.cachedIn(viewModelScope)
+    val userRecipes: Flow<PagingData<RecipeResponse>> = _refreshTrigger.flatMapLatest {
+        Pager(
+            config = PagingConfig(pageSize = 10),
+            pagingSourceFactory = { RecipePagingSource(apiService, _userId.value) }
+        ).flow
+    }.cachedIn(viewModelScope)
 
     private val _userName = MutableStateFlow("John Doe")
     val userName: StateFlow<String> = _userName.asStateFlow()
@@ -45,8 +54,8 @@ class BiteBookViewModel : ViewModel() {
     private val _selectedRecipe = MutableStateFlow<RecipeResponse?>(null)
     val selectedRecipe: StateFlow<RecipeResponse?> = _selectedRecipe.asStateFlow()
 
-    init {
-        // loadUserRecipes() no longer needed as userRecipes is now a Paging Flow
+    fun triggerRefresh() {
+        _refreshTrigger.value = System.currentTimeMillis()
     }
 
     fun getRecipeById(id: String) {
@@ -85,7 +94,8 @@ class BiteBookViewModel : ViewModel() {
         servings: Int,
         ingredients: List<Ingredient>,
         instructions: List<String>,
-        onSuccess: () -> Unit
+        onSuccess: () -> Unit,
+        onError: (Exception) -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
@@ -101,10 +111,10 @@ class BiteBookViewModel : ViewModel() {
                     userId = _userId.value
                 )
                 apiService.createRecipe(request)
-                loadUserRecipes()
+                triggerRefresh()
                 onSuccess()
             } catch (e: Exception) {
-                // Handle error
+                onError(e)
             }
         }
     }
@@ -119,7 +129,8 @@ class BiteBookViewModel : ViewModel() {
         servings: Int,
         ingredients: List<Ingredient>,
         instructions: List<String>,
-        onSuccess: () -> Unit
+        onSuccess: () -> Unit,
+        onError: (Exception) -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
@@ -135,10 +146,10 @@ class BiteBookViewModel : ViewModel() {
                     userId = _userId.value
                 )
                 apiService.updateRecipe(id, request)
-                loadUserRecipes()
+                triggerRefresh()
                 onSuccess()
             } catch (e: Exception) {
-                // Handle error
+                onError(e)
             }
         }
     }
@@ -147,7 +158,7 @@ class BiteBookViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 apiService.deleteRecipe(recipeId)
-                loadUserRecipes()
+                triggerRefresh()
             } catch (e: Exception) {
                 // Handle error
             }
