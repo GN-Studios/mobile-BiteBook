@@ -6,10 +6,33 @@ import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class User(
-    val id: String? = null,
+    val _id: String? = null,
+    val username: String = "",
     val name: String = "",
     val email: String = "",
-    val password: String? = null
+    val password: String? = null,
+    val image: String? = null
+)
+
+@Serializable
+data class AuthResponse(
+    val message: String? = null,
+    val token: String? = null,
+    val user: User? = null
+)
+
+@Serializable
+data class RegisterRequest(
+    val username: String,
+    val email: String,
+    val password: String,
+    val image: String? = null
+)
+
+@Serializable
+data class LoginRequest(
+    val username: String,
+    val password: String
 )
 
 @Serializable

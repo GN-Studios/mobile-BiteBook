@@ -1,27 +1,23 @@
 package com.example.bitebook
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.example.bitebook.api.RetrofitInstance
-import com.example.bitebook.data.Ingredient
-import com.example.bitebook.data.RecipeRequest
-import com.example.bitebook.data.RecipeResponse
-import com.example.bitebook.data.RecipePagingSource
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
+import com.example.bitebook.api.TokenManager
+import com.example.bitebook.data.*
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class BiteBookViewModel : ViewModel() {
+class BiteBookViewModel(application: Application) : AndroidViewModel(application) {
     private val apiService = RetrofitInstance.api
+    private val tokenManager = TokenManager(application)
 
     private val _refreshTrigger = MutableStateFlow(System.currentTimeMillis())
 
@@ -29,31 +25,35 @@ class BiteBookViewModel : ViewModel() {
         Pager(
             config = PagingConfig(
                 pageSize = 10,
-                initialLoadSize = 10, // Ensure initial load matches page size to avoid duplicates
+                initialLoadSize = 10,
                 enablePlaceholders = false
             ),
             pagingSourceFactory = { RecipePagingSource(apiService) }
         ).flow
     }.cachedIn(viewModelScope)
 
-    private val _userId = MutableStateFlow("698fc782633cc499a80d94c3") // Hardcoded for now
+    private val _userId = MutableStateFlow(tokenManager.getUserId() ?: "")
     val userId: StateFlow<String> = _userId.asStateFlow()
 
-    val userRecipes: Flow<PagingData<RecipeResponse>> = _refreshTrigger.flatMapLatest {
-        Pager(
-            config = PagingConfig(
-                pageSize = 10,
-                initialLoadSize = 10,
-                enablePlaceholders = false
-            ),
-            pagingSourceFactory = { RecipePagingSource(apiService, _userId.value) }
-        ).flow
-    }.cachedIn(viewModelScope)
+    private val _isLoggedIn = MutableStateFlow(tokenManager.getToken() != null)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
-    private val _userName = MutableStateFlow("John Doe")
+    val userRecipes: Flow<PagingData<RecipeResponse>> = combine(_refreshTrigger, _userId) { _, id -> id }
+        .flatMapLatest { id ->
+            Pager(
+                config = PagingConfig(
+                    pageSize = 10,
+                    initialLoadSize = 10,
+                    enablePlaceholders = false
+                ),
+                pagingSourceFactory = { RecipePagingSource(apiService, id) }
+            ).flow
+        }.cachedIn(viewModelScope)
+
+    private val _userName = MutableStateFlow("Guest")
     val userName: StateFlow<String> = _userName.asStateFlow()
 
-    private val _userEmail = MutableStateFlow("john.doe@example.com")
+    private val _userEmail = MutableStateFlow("")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
     private val _profileImageUri = MutableStateFlow<String?>(null)
@@ -61,6 +61,61 @@ class BiteBookViewModel : ViewModel() {
 
     private val _selectedRecipe = MutableStateFlow<RecipeResponse?>(null)
     val selectedRecipe: StateFlow<RecipeResponse?> = _selectedRecipe.asStateFlow()
+
+    init {
+        // Initialize Retrofit with context if not already done
+        RetrofitInstance.init(application)
+        
+        // Load user data if logged in
+        if (_isLoggedIn.value) {
+            // Ideally we'd have a 'me' endpoint, but for now we rely on stored data
+            // or fetch users list (not efficient)
+        }
+    }
+
+    fun login(request: LoginRequest, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.login(request)
+                if (response.token != null && response.user?._id != null) {
+                    tokenManager.saveToken(response.token)
+                    tokenManager.saveUserId(response.user._id)
+                    _userId.value = response.user._id
+                    _userName.value = response.user.username
+                    _userEmail.value = response.user.email
+                    _profileImageUri.value = response.user.image
+                    _isLoggedIn.value = true
+                    onSuccess()
+                } else {
+                    onError(response.message ?: "Login failed")
+                }
+            } catch (e: Exception) {
+                onError(e.message ?: "Network error")
+            }
+        }
+    }
+
+    fun register(request: RegisterRequest, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.register(request)
+                if (response.token != null && response.user?._id != null) {
+                    tokenManager.saveToken(response.token)
+                    tokenManager.saveUserId(response.user._id)
+                    _userId.value = response.user._id
+                    _userName.value = response.user.username
+                    _userEmail.value = response.user.email
+                    _profileImageUri.value = response.user.image
+                    _isLoggedIn.value = true
+                    onSuccess()
+                } else {
+                    onError(response.message ?: "Registration failed")
+                }
+            } catch (e: Exception) {
+                onError(e.message ?: "Network error")
+            }
+        }
+    }
 
     fun triggerRefresh() {
         _refreshTrigger.value = System.currentTimeMillis()
@@ -91,21 +146,19 @@ class BiteBookViewModel : ViewModel() {
         }
     }
 
-    private fun loadUserRecipes() {
-        // Re-triggering of paging data can be handled by UI or by refreshing the flow if needed
-    }
-
     fun updateProfile(name: String, imageUri: String?) {
         _userName.value = name
         _profileImageUri.value = imageUri
+        // TODO: Call API to update user on server
     }
 
     fun logout() {
-        // TODO: Implement actual logout (clear tokens, navigate to login)
+        tokenManager.clearToken()
         _userId.value = ""
-        _userName.value = ""
+        _userName.value = "Guest"
         _userEmail.value = ""
         _profileImageUri.value = null
+        _isLoggedIn.value = false
     }
 
     fun addRecipe(

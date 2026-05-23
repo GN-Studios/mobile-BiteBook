@@ -24,10 +24,11 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun SignUpScreen(
-    onSignUpSuccess: () -> Unit,
+    onSignUpSuccess: (String, String, String, String) -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
-    var fullName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -54,7 +55,7 @@ fun SignUpScreen(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Default.RestaurantMenu, // Placeholder for the chef hat icon
+                    imageVector = Icons.Default.RestaurantMenu,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(40.dp)
@@ -91,9 +92,19 @@ fun SignUpScreen(
                 modifier = Modifier.padding(24.dp)
             ) {
                 AuthTextField(
+                    label = "Username",
+                    value = username,
+                    onValueChange = { username = it },
+                    placeholder = "johndoe123",
+                    leadingIcon = Icons.Default.Person
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                AuthTextField(
                     label = "Full Name",
-                    value = fullName,
-                    onValueChange = { fullName = it },
+                    value = name,
+                    onValueChange = { name = it },
                     placeholder = "John Doe",
                     leadingIcon = Icons.Default.Person
                 )
@@ -153,12 +164,17 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = onSignUpSuccess,
+                    onClick = {
+                        if (password == confirmPassword && agreeToTerms) {
+                            onSignUpSuccess(username, name, email, password)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                    enabled = username.isNotBlank() && name.isNotBlank() && email.isNotBlank() && password.length >= 8 && agreeToTerms
                 ) {
                     Text("Create Account", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
@@ -182,10 +198,10 @@ fun SignUpScreen(
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (String, String) -> Unit,
     onNavigateToSignUp: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
     val primaryColor = Color(0xFFF08143)
@@ -244,12 +260,11 @@ fun LoginScreen(
                 modifier = Modifier.padding(24.dp)
             ) {
                 AuthTextField(
-                    label = "Email Address",
-                    value = email,
-                    onValueChange = { email = it },
-                    placeholder = "your@email.com",
-                    leadingIcon = Icons.Default.Email,
-                    keyboardType = KeyboardType.Email
+                    label = "Username",
+                    value = username,
+                    onValueChange = { username = it },
+                    placeholder = "johndoe123",
+                    leadingIcon = Icons.Default.Person
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -275,12 +290,13 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = { onLoginSuccess(username, password) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                    enabled = username.isNotBlank() && password.isNotBlank()
                 ) {
                     Text("Log In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }

@@ -4,6 +4,12 @@ import com.example.bitebook.data.*
 import retrofit2.http.*
 
 interface ApiService {
+    @POST("api/auth/register")
+    suspend fun register(@Body request: RegisterRequest): AuthResponse
+
+    @POST("api/auth/login")
+    suspend fun login(@Body request: LoginRequest): AuthResponse
+
     @GET("api/users")
     suspend fun getUsers(): List<User>
 
