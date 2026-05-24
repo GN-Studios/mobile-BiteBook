@@ -199,7 +199,9 @@ fun SignUpScreen(
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String, String) -> Unit,
-    onNavigateToSignUp: () -> Unit
+    onNavigateToSignUp: () -> Unit,
+    errorMessage: String? = null,
+    onClearError: () -> Unit = {}
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -259,12 +261,28 @@ fun LoginScreen(
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 AuthTextField(
                     label = "Username",
                     value = username,
-                    onValueChange = { username = it },
+                    onValueChange = { 
+                        username = it
+                        if (errorMessage != null) onClearError()
+                    },
                     placeholder = "johndoe123",
-                    leadingIcon = Icons.Default.Person
+                    leadingIcon = Icons.Default.Person,
+                    isError = errorMessage != null
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -272,10 +290,14 @@ fun LoginScreen(
                 AuthTextField(
                     label = "Password",
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { 
+                        password = it
+                        if (errorMessage != null) onClearError()
+                    },
                     placeholder = "........",
                     leadingIcon = Icons.Default.Lock,
-                    isPassword = true
+                    isPassword = true,
+                    isError = errorMessage != null
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -325,14 +347,15 @@ fun AuthTextField(
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
     isPassword: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
-    helperText: String? = null
+    helperText: String? = null,
+    isError: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF2D2D2D),
+            color = if (isError) Color.Red else Color(0xFF2D2D2D),
             modifier = Modifier.padding(bottom = 8.dp)
         )
         OutlinedTextField(
@@ -344,19 +367,21 @@ fun AuthTextField(
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = Color.LightGray
+                    tint = if (isError) Color.Red else Color.LightGray
                 )
             },
+            isError = isError,
             visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFFF08143),
                 unfocusedBorderColor = Color(0xFFF1F1F1),
+                errorBorderColor = Color.Red,
                 cursorColor = Color(0xFFF08143)
             )
         )
-        if (helperText != null) {
+        if (helperText != null && !isError) {
             Text(
                 text = helperText,
                 style = MaterialTheme.typography.bodySmall,

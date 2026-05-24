@@ -38,6 +38,9 @@ class BiteBookViewModel(application: Application) : AndroidViewModel(application
     private val _isLoggedIn = MutableStateFlow(tokenManager.getToken() != null)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    private val _authError = MutableStateFlow<String?>(null)
+    val authError: StateFlow<String?> = _authError.asStateFlow()
+
     val userRecipes: Flow<PagingData<RecipeResponse>> = combine(_refreshTrigger, _userId) { _, id -> id }
         .flatMapLatest { id ->
             Pager(
@@ -73,7 +76,12 @@ class BiteBookViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun clearAuthError() {
+        _authError.value = null
+    }
+
     fun login(request: LoginRequest, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        _authError.value = null
         viewModelScope.launch {
             try {
                 val response = apiService.login(request)
@@ -87,15 +95,20 @@ class BiteBookViewModel(application: Application) : AndroidViewModel(application
                     _isLoggedIn.value = true
                     onSuccess()
                 } else {
-                    onError(response.message ?: "Login failed")
+                    val message = response.message ?: "Login failed"
+                    _authError.value = message
+                    onError(message)
                 }
             } catch (e: Exception) {
-                onError(e.message ?: "Network error")
+                val message = e.message ?: "Network error"
+                _authError.value = message
+                onError(message)
             }
         }
     }
 
     fun register(request: RegisterRequest, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        _authError.value = null
         viewModelScope.launch {
             try {
                 val response = apiService.register(request)
@@ -109,10 +122,14 @@ class BiteBookViewModel(application: Application) : AndroidViewModel(application
                     _isLoggedIn.value = true
                     onSuccess()
                 } else {
-                    onError(response.message ?: "Registration failed")
+                    val message = response.message ?: "Registration failed"
+                    _authError.value = message
+                    onError(message)
                 }
             } catch (e: Exception) {
-                onError(e.message ?: "Network error")
+                val message = e.message ?: "Network error"
+                _authError.value = message
+                onError(message)
             }
         }
     }

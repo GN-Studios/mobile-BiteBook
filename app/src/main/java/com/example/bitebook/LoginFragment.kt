@@ -4,7 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -24,6 +25,8 @@ class LoginFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setContent {
                 BiteBookTheme {
+                    val authError by viewModel.authError.collectAsState()
+                    
                     LoginScreen(
                         onLoginSuccess = { username, password ->
                             viewModel.login(
@@ -31,17 +34,27 @@ class LoginFragment : Fragment() {
                                 onSuccess = {
                                     findNavController().navigate(R.id.homeFragment)
                                 },
-                                onError = { error ->
-                                    Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()
+                                onError = { _ ->
+                                    // Error is handled via authError state collection
                                 }
                             )
                         },
                         onNavigateToSignUp = {
+                            viewModel.clearAuthError()
                             findNavController().navigate(R.id.signUpFragment)
+                        },
+                        errorMessage = authError,
+                        onClearError = {
+                            viewModel.clearAuthError()
                         }
                     )
                 }
             }
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        viewModel.clearAuthError()
     }
 }
