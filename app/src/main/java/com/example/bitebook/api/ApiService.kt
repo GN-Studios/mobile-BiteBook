@@ -16,6 +16,9 @@ interface ApiService {
     @POST("api/users")
     suspend fun createUser(@Body user: User): User
 
+    @PUT("api/users/{id}")
+    suspend fun updateUser(@Path("id") id: String, @Body user: User): User
+
     @GET("api/recipes")
     suspend fun getRecipes(
         @Query("page") page: Int = 1,

@@ -15,15 +15,33 @@ class TokenManager(context: Context) {
         return prefs.getString("jwt_token", null)
     }
 
-    fun clearToken() {
-        prefs.edit().remove("jwt_token").apply()
-    }
-
     fun saveUserId(userId: String) {
         prefs.edit().putString("user_id", userId).apply()
     }
 
     fun getUserId(): String? {
         return prefs.getString("user_id", null)
+    }
+
+    fun saveUserInfo(username: String, name: String, email: String, image: String?) {
+        prefs.edit()
+            .putString("username", username)
+            .putString("name", name)
+            .putString("email", email)
+            .putString("image", image)
+            .apply()
+    }
+
+    fun getUserInfo(): Map<String, String?> {
+        return mapOf(
+            "username" to prefs.getString("username", ""),
+            "name" to prefs.getString("name", ""),
+            "email" to prefs.getString("email", ""),
+            "image" to prefs.getString("image", null)
+        )
+    }
+
+    fun clearToken() {
+        prefs.edit().clear().apply()
     }
 }

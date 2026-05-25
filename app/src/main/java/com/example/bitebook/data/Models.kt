@@ -2,7 +2,7 @@ package com.example.bitebook.data
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.*
 
 @Serializable
 data class User(
@@ -13,6 +13,16 @@ data class User(
     val password: String? = null,
     val image: String? = null
 )
+
+object UserOrIdSerializer : JsonTransformingSerializer<User>(User.serializer()) {
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        return if (element is JsonPrimitive && element.isString) {
+            JsonObject(mapOf("_id" to element))
+        } else {
+            element
+        }
+    }
+}
 
 @Serializable
 data class AuthResponse(
@@ -53,7 +63,9 @@ data class RecipeResponse(
     val servings: Int = 0,
     val ingredients: List<Ingredient> = emptyList(),
     val instructions: List<String> = emptyList(),
-    val userId: String? = null,
+    @Serializable(with = UserOrIdSerializer::class)
+    val userId: User? = null,
+    @Serializable(with = UserOrIdSerializer::class)
     val author: User? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
@@ -79,7 +91,9 @@ data class SingleRecipeResponse(
     val servings: Int? = null,
     val ingredients: List<Ingredient>? = null,
     val instructions: List<String>? = null,
-    val userId: String? = null,
+    @Serializable(with = UserOrIdSerializer::class)
+    val userId: User? = null,
+    @Serializable(with = UserOrIdSerializer::class)
     val author: User? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,

@@ -853,11 +853,16 @@ fun ProfileScreen(
 ) {
     val userRecipes = viewModel.userRecipes.collectAsLazyPagingItems()
     val userName by viewModel.userName.collectAsState()
+    val userEmail by viewModel.userEmail.collectAsState()
+    val accountUsername by viewModel.accountUsername.collectAsState()
     val profileImageUri by viewModel.profileImageUri.collectAsState()
     
+    val isUpdatingProfile by viewModel.isUpdatingProfile.collectAsState()
+
     var isEditingProfile by remember { mutableStateOf(false) }
-    var editedName by remember { mutableStateOf(userName) }
-    var editedImageUri by remember { mutableStateOf<Uri?>(profileImageUri?.let { Uri.parse(it) }) }
+    var editedName by remember(userName) { mutableStateOf(userName) }
+    var editedEmail by remember(userEmail) { mutableStateOf(userEmail) }
+    var editedImageUri by remember(profileImageUri) { mutableStateOf<Uri?>(profileImageUri?.let { Uri.parse(it) }) }
 
     LaunchedEffect(Unit) {
         viewModel.triggerRefresh()
@@ -889,6 +894,7 @@ fun ProfileScreen(
     ) {
         // Top Profile Section
         Row(
+
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
@@ -943,7 +949,15 @@ fun ProfileScreen(
                             value = editedName,
                             onValueChange = { editedName = it },
                             label = { Text("Name") },
-                            modifier = Modifier.width(150.dp),
+                            modifier = Modifier.width(200.dp),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = editedEmail,
+                            onValueChange = { editedEmail = it },
+                            label = { Text("Email") },
+                            modifier = Modifier.width(200.dp),
                             singleLine = true
                         )
                     } else {
@@ -952,9 +966,24 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
+                        if (accountUsername.isNotBlank()) {
+                            Text(
+                                text = "@$accountUsername",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFFF08143)
+                            )
+                        }
+                        if (userEmail.isNotBlank()) {
+                            Text(
+                                text = userEmail,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "${userRecipes.itemCount} recipes",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray
                         )
                     }
@@ -963,21 +992,37 @@ fun ProfileScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isEditingProfile) {
-                    IconButton(onClick = {
-                        viewModel.updateProfile(editedName, editedImageUri?.toString())
-                        isEditingProfile = false
-                    }) {
-                        Icon(Icons.Default.Check, contentDescription = "Save", tint = Color(0xFF4CAF50))
-                    }
-                    IconButton(onClick = {
-                        isEditingProfile = false
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color(0xFFF44336))
+                    if (isUpdatingProfile) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color(0xFFF08143),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(onClick = {
+                            viewModel.updateProfile(
+                                editedName,
+                                editedEmail,
+                                editedImageUri?.toString(),
+                                onSuccess = { isEditingProfile = false }
+                            )
+                        }) {
+                            Icon(Icons.Default.Check, contentDescription = "Save", tint = Color(0xFF4CAF50))
+                        }
+                        IconButton(onClick = {
+                            isEditingProfile = false
+                            editedName = userName
+                            editedEmail = userEmail
+                            editedImageUri = profileImageUri?.let { Uri.parse(it) }
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color(0xFFF44336))
+                        }
                     }
                 } else {
                     IconButton(
                         onClick = { 
                             editedName = userName
+                            editedEmail = userEmail
                             editedImageUri = profileImageUri?.let { Uri.parse(it) }
                             isEditingProfile = true 
                         },
