@@ -23,7 +23,7 @@ class RecipeDetailFragment : Fragment() {
                     RecipeDetailScreen(
                         recipeId = args.recipeId,
                         onBack = {
-                            parentFragmentManager.popBackStack()
+                            requireActivity().onBackPressedDispatcher.onBackPressed()
                         }
                     )
                 }

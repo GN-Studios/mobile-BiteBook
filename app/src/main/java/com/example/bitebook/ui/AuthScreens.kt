@@ -24,10 +24,11 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun SignUpScreen(
-    onSignUpSuccess: () -> Unit,
+    onSignUpSuccess: (String, String, String, String) -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
-    var fullName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -54,7 +55,7 @@ fun SignUpScreen(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Default.RestaurantMenu, // Placeholder for the chef hat icon
+                    imageVector = Icons.Default.RestaurantMenu,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(40.dp)
@@ -91,9 +92,19 @@ fun SignUpScreen(
                 modifier = Modifier.padding(24.dp)
             ) {
                 AuthTextField(
+                    label = "Username",
+                    value = username,
+                    onValueChange = { username = it },
+                    placeholder = "johndoe123",
+                    leadingIcon = Icons.Default.Person
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                AuthTextField(
                     label = "Full Name",
-                    value = fullName,
-                    onValueChange = { fullName = it },
+                    value = name,
+                    onValueChange = { name = it },
                     placeholder = "John Doe",
                     leadingIcon = Icons.Default.Person
                 )
@@ -153,12 +164,17 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = onSignUpSuccess,
+                    onClick = {
+                        if (password == confirmPassword && agreeToTerms) {
+                            onSignUpSuccess(username, name, email, password)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                    enabled = username.isNotBlank() && name.isNotBlank() && email.isNotBlank() && password.length >= 8 && agreeToTerms
                 ) {
                     Text("Create Account", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
@@ -182,10 +198,12 @@ fun SignUpScreen(
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onNavigateToSignUp: () -> Unit
+    onLoginSuccess: (String, String) -> Unit,
+    onNavigateToSignUp: () -> Unit,
+    errorMessage: String? = null,
+    onClearError: () -> Unit = {}
 ) {
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
     val primaryColor = Color(0xFFF08143)
@@ -243,13 +261,28 @@ fun LoginScreen(
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 AuthTextField(
-                    label = "Email Address",
-                    value = email,
-                    onValueChange = { email = it },
-                    placeholder = "your@email.com",
-                    leadingIcon = Icons.Default.Email,
-                    keyboardType = KeyboardType.Email
+                    label = "Username",
+                    value = username,
+                    onValueChange = { 
+                        username = it
+                        if (errorMessage != null) onClearError()
+                    },
+                    placeholder = "johndoe123",
+                    leadingIcon = Icons.Default.Person,
+                    isError = errorMessage != null
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -257,10 +290,14 @@ fun LoginScreen(
                 AuthTextField(
                     label = "Password",
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { 
+                        password = it
+                        if (errorMessage != null) onClearError()
+                    },
                     placeholder = "........",
                     leadingIcon = Icons.Default.Lock,
-                    isPassword = true
+                    isPassword = true,
+                    isError = errorMessage != null
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -275,12 +312,13 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = { onLoginSuccess(username, password) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                    enabled = username.isNotBlank() && password.isNotBlank()
                 ) {
                     Text("Log In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
@@ -309,14 +347,15 @@ fun AuthTextField(
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
     isPassword: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
-    helperText: String? = null
+    helperText: String? = null,
+    isError: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF2D2D2D),
+            color = if (isError) Color.Red else Color(0xFF2D2D2D),
             modifier = Modifier.padding(bottom = 8.dp)
         )
         OutlinedTextField(
@@ -328,19 +367,21 @@ fun AuthTextField(
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = Color.LightGray
+                    tint = if (isError) Color.Red else Color.LightGray
                 )
             },
+            isError = isError,
             visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFFF08143),
                 unfocusedBorderColor = Color(0xFFF1F1F1),
+                errorBorderColor = Color.Red,
                 cursorColor = Color(0xFFF08143)
             )
         )
-        if (helperText != null) {
+        if (helperText != null && !isError) {
             Text(
                 text = helperText,
                 style = MaterialTheme.typography.bodySmall,

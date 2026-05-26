@@ -1,0 +1,124 @@
+package com.example.bitebook.data
+
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+
+@Serializable
+data class User(
+    val _id: String? = null,
+    val username: String = "",
+    val name: String = "",
+    val email: String = "",
+    val password: String? = null,
+    val image: String? = null
+)
+
+object UserOrIdSerializer : JsonTransformingSerializer<User>(User.serializer()) {
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        return if (element is JsonPrimitive && element.isString) {
+            JsonObject(mapOf("_id" to element))
+        } else {
+            element
+        }
+    }
+}
+
+@Serializable
+data class AuthResponse(
+    val message: String? = null,
+    val token: String? = null,
+    val user: User? = null
+)
+
+@Serializable
+data class RegisterRequest(
+    val username: String,
+    val email: String,
+    val password: String,
+    val image: String? = null
+)
+
+@Serializable
+data class LoginRequest(
+    val username: String,
+    val password: String
+)
+
+@Serializable
+data class Ingredient(
+    val amount: String = "",
+    val name: String = "",
+    val _id: String? = null
+)
+
+@Serializable
+data class RecipeResponse(
+    val _id: String = "",
+    val title: String = "",
+    val description: String = "",
+    val image: String? = null,
+    val prepTime: Int = 0,
+    val cookTime: Int = 0,
+    val servings: Int = 0,
+    val ingredients: List<Ingredient> = emptyList(),
+    val instructions: List<String> = emptyList(),
+    @Serializable(with = UserOrIdSerializer::class)
+    val userId: User? = null,
+    @Serializable(with = UserOrIdSerializer::class)
+    val author: User? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+)
+
+@Serializable
+data class RecipeListResponse(
+    val data: List<RecipeResponse> = emptyList()
+)
+
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class SingleRecipeResponse(
+    val message: String? = null,
+    @JsonNames("data", "recipe")
+    val recipe: RecipeResponse? = null,
+    val _id: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val image: String? = null,
+    val prepTime: Int? = null,
+    val cookTime: Int? = null,
+    val servings: Int? = null,
+    val ingredients: List<Ingredient>? = null,
+    val instructions: List<String>? = null,
+    @Serializable(with = UserOrIdSerializer::class)
+    val userId: User? = null,
+    @Serializable(with = UserOrIdSerializer::class)
+    val author: User? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val __v: Int? = null
+)
+
+@Serializable
+data class RecipeRequest(
+    val title: String,
+    val description: String,
+    val image: String? = null,
+    val prepTime: Int,
+    val cookTime: Int,
+    val servings: Int,
+    val ingredients: List<Ingredient>,
+    val instructions: List<String>,
+    val userId: String
+)
+
+@Serializable
+data class ChatGptRequest(
+    val input: String
+)
+
+@Serializable
+data class ChatGptResponse(
+    val suggestion: String
+)

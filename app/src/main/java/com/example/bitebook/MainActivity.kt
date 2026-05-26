@@ -1,6 +1,5 @@
 package com.example.bitebook
 
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,12 +40,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -66,22 +65,32 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.navOptions
 import coil.compose.AsyncImage
+import android.net.Uri
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
+import com.example.bitebook.data.RecipeResponse
+import com.example.bitebook.data.Ingredient
 import com.example.bitebook.ui.theme.BiteBookTheme
 
 class MainActivity : AppCompatActivity() {
@@ -103,6 +112,7 @@ fun BiteBookApp() {
     var navController by remember { mutableStateOf<NavController?>(null) }
     var currentDestinationId by remember { mutableStateOf<Int?>(null) }
 
+    // Navigation listener to update UI when back stack changes
     DisposableEffect(navController) {
         val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
             currentDestinationId = destination.id
@@ -113,8 +123,8 @@ fun BiteBookApp() {
         }
     }
 
-    val showNavigation = currentDestinationId != null && 
-            currentDestinationId != R.id.loginFragment && 
+    val showNavigation = currentDestinationId != null &&
+            currentDestinationId != R.id.loginFragment &&
             currentDestinationId != R.id.signUpFragment
 
     NavigationSuiteScaffold(
@@ -133,7 +143,7 @@ fun BiteBookApp() {
                         onClick = {
                             val controller = navController ?: return@item
                             val destId = destination.id
-                            
+
                             controller.navigate(
                                 destId,
                                 null,
@@ -183,11 +193,29 @@ fun HomeScreen(
     onLogout: () -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
-    val recipes by viewModel.recipes.collectAsState()
+    val recipes = viewModel.recipes.collectAsLazyPagingItems()
     val userName by viewModel.userName.collectAsState()
     val profileImageUri by viewModel.profileImageUri.collectAsState()
 
-    Column(modifier = modifier.fillMaxSize().background(Color.White)) {
+    LaunchedEffect(Unit) {
+        viewModel.triggerRefresh()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.triggerRefresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        // ... (Header remains mostly same, but maybe uses first letter of userName)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -196,6 +224,8 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Profile Avatar instead of logo if preferred, or keep logo.
+                // Let's keep the logo but welcome the user.
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.size(40.dp),
@@ -258,16 +288,32 @@ fun HomeScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(recipes) { recipe ->
-                RecipeCard(
-                    recipe = recipe,
-                    onClick = { onRecipeClick(recipe.id) }
-                )
+        if (recipes.loadState.refresh is LoadState.Loading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFFF08143))
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(
+                    count = recipes.itemCount,
+                    key = recipes.itemKey { it._id },
+                    contentType = recipes.itemContentType { "recipe" }
+                ) { index ->
+                    val recipe = recipes[index]
+                    if (recipe != null) {
+                        RecipeCard(
+                            recipe = recipe,
+                            onClick = { onRecipeClick(recipe._id) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -275,7 +321,7 @@ fun HomeScreen(
 
 @Composable
 fun RecipeCard(
-    recipe: Recipe,
+    recipe: RecipeResponse,
     onClick: () -> Unit = {},
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null
@@ -296,9 +342,10 @@ fun RecipeCard(
                     .fillMaxWidth()
                     .height(200.dp)
             ) {
-                if (recipe.imageUrl != null) {
+                // Image
+                if (recipe.image != null) {
                     AsyncImage(
-                        model = recipe.imageUrl,
+                        model = recipe.image,
                         contentDescription = recipe.title,
                         modifier = Modifier
                             .fillMaxSize()
@@ -320,6 +367,7 @@ fun RecipeCard(
                     }
                 }
 
+                // Edit and Delete Overlays (Only shown if callbacks are provided)
                 if (onEdit != null || onDelete != null) {
                     Row(
                         modifier = Modifier
@@ -379,34 +427,46 @@ fun RecipeCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.AccessTime,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = recipe.time, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        
-                        Spacer(modifier = Modifier.width(12.dp))
-                        
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = recipe.servings.toString(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AccessTime,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFFF08143)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${recipe.prepTime + recipe.cookTime} min",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Restaurant,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFFF08143)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${recipe.servings}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
                     }
+
+
                 }
             }
         }
@@ -418,28 +478,62 @@ fun AddRecipeScreen(
     modifier: Modifier = Modifier,
     recipeId: String? = null,
     onCancel: () -> Unit = {},
-    onCreate: (Recipe) -> Unit = {},
+    onCreate: () -> Unit = {},
+    onUpdate: () -> Unit = {},
+    onError: (String) -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
-    val recipes by viewModel.recipes.collectAsState()
-    val existingRecipe = remember(recipeId, recipes) {
-        recipes.find { it.id == recipeId }
+    val userRecipes = viewModel.userRecipes.collectAsLazyPagingItems()
+
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var prepTime by remember { mutableStateOf("") }
+    var cookTime by remember { mutableStateOf("") }
+    var servings by remember { mutableStateOf("4") }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val ingredients = remember { mutableStateListOf<Ingredient>(Ingredient("", "")) }
+    val instructions = remember { mutableStateListOf<String>("") }
+
+    val selectedRecipe by viewModel.selectedRecipe.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(recipeId) {
+        if (recipeId != null) {
+            // Try to find in current list first to avoid extra network call if possible
+            val existing = (0 until userRecipes.itemCount).mapNotNull { userRecipes[it] }.find { it._id == recipeId }
+            if (existing != null) {
+                title = existing.title
+                description = existing.description
+                prepTime = existing.prepTime.toString()
+                cookTime = existing.cookTime.toString()
+                servings = existing.servings.toString()
+                imageUri = existing.image?.let { Uri.parse(it) }
+                ingredients.clear()
+                ingredients.addAll(existing.ingredients)
+                instructions.clear()
+                instructions.addAll(existing.instructions)
+            } else {
+                viewModel.getRecipeById(recipeId)
+            }
+        }
     }
 
-    var title by remember { mutableStateOf(existingRecipe?.title ?: "") }
-    var description by remember { mutableStateOf(existingRecipe?.description ?: "") }
-    
-    val initialPrepTime = remember(existingRecipe) {
-        existingRecipe?.time?.replace(" min", "")?.toIntOrNull()?.let { it / 2 }?.toString() ?: ""
+    androidx.compose.runtime.LaunchedEffect(selectedRecipe) {
+        if (recipeId != null && selectedRecipe?._id == recipeId && title.isEmpty()) {
+            selectedRecipe?.let { recipe ->
+                title = recipe.title
+                description = recipe.description
+                prepTime = recipe.prepTime.toString()
+                cookTime = recipe.cookTime.toString()
+                servings = recipe.servings.toString()
+                imageUri = recipe.image?.let { Uri.parse(it) }
+                ingredients.clear()
+                ingredients.addAll(recipe.ingredients)
+                instructions.clear()
+                instructions.addAll(recipe.instructions)
+            }
+        }
     }
-    val initialCookTime = remember(existingRecipe) {
-        existingRecipe?.time?.replace(" min", "")?.toIntOrNull()?.let { it - (it / 2) }?.toString() ?: ""
-    }
-
-    var prepTime by remember { mutableStateOf(initialPrepTime) }
-    var cookTime by remember { mutableStateOf(initialCookTime) }
-    var servings by remember { mutableStateOf(existingRecipe?.servings?.toString() ?: "4") }
-    var imageUri by remember { mutableStateOf<Uri?>(existingRecipe?.imageUrl?.let { Uri.parse(it) }) }
     
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -447,32 +541,15 @@ fun AddRecipeScreen(
         imageUri = uri
     }
 
-    val ingredients = remember { 
-        mutableStateListOf<Pair<String, String>>().apply {
-            if (existingRecipe != null) {
-                addAll(existingRecipe.ingredients)
-            } else {
-                add(Pair("", ""))
-            }
-        }
-    }
-    val instructions = remember { 
-        mutableStateListOf<String>().apply {
-            if (existingRecipe != null) {
-                addAll(existingRecipe.instructions)
-            } else {
-                add("")
-            }
-        }
-    }
+    var isSaving by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+        // ... (Header and Image Upload same as before)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -496,6 +573,7 @@ fun AddRecipeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Recipe Image Upload
         Text(text = "Recipe Image", fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         Box(
@@ -530,6 +608,7 @@ fun AddRecipeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Recipe Title
         Text(text = "Recipe Title *", fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = title,
@@ -541,6 +620,7 @@ fun AddRecipeScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Description
         Text(text = "Description *", fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = description,
@@ -554,6 +634,7 @@ fun AddRecipeScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Prep Time, Cook Time, Servings
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "Prep Time (min)", fontWeight = FontWeight.Bold)
@@ -561,37 +642,35 @@ fun AddRecipeScreen(
                     value = prepTime,
                     onValueChange = { prepTime = it },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true
                 )
             }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "Cook Time (min)", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = cookTime,
                     onValueChange = { cookTime = it },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Servings", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = servings,
+                    onValueChange = { servings = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(text = "Servings", fontWeight = FontWeight.Bold)
-        OutlinedTextField(
-            value = servings,
-            onValueChange = { servings = it },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
-        )
-
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Ingredients Section
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -599,7 +678,7 @@ fun AddRecipeScreen(
         ) {
             Text(text = "Ingredients", fontWeight = FontWeight.Bold)
             OutlinedButton(
-                onClick = { ingredients.add(Pair("", "")) },
+                onClick = { ingredients.add(Ingredient("", "")) },
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.height(36.dp)
             ) {
@@ -617,15 +696,15 @@ fun AddRecipeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = ingredient.first,
-                    onValueChange = { ingredients[index] = it to ingredient.second },
+                    value = ingredient.amount,
+                    onValueChange = { ingredients[index] = Ingredient(it, ingredient.name) },
                     placeholder = { Text("Amount", fontSize = MaterialTheme.typography.bodySmall.fontSize) },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 )
                 OutlinedTextField(
-                    value = ingredient.second,
-                    onValueChange = { ingredients[index] = ingredient.first to it },
+                    value = ingredient.name,
+                    onValueChange = { ingredients[index] = Ingredient(ingredient.amount, it) },
                     placeholder = { Text("Ingredient name", fontSize = MaterialTheme.typography.bodySmall.fontSize) },
                     modifier = Modifier.weight(2f),
                     shape = RoundedCornerShape(8.dp)
@@ -638,6 +717,7 @@ fun AddRecipeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Instructions Section
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -685,6 +765,7 @@ fun AddRecipeScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -698,34 +779,62 @@ fun AddRecipeScreen(
             }
             Button(
                 onClick = {
-                    val totalTime = if (prepTime.isNotEmpty() || cookTime.isNotEmpty()) {
-                        "${(prepTime.toIntOrNull() ?: 0) + (cookTime.toIntOrNull() ?: 0)} min"
-                    } else "0 min"
-                    
-                    val recipe = Recipe(
-                        id = recipeId ?: java.util.UUID.randomUUID().toString(),
-                        title = title,
-                        description = description,
-                        imageUrl = imageUri?.toString(),
-                        time = totalTime,
-                        servings = servings.toIntOrNull() ?: 1,
-                        ingredients = ingredients.toList(),
-                        instructions = instructions.toList()
-                    )
-                    
+                    isSaving = true
                     if (recipeId == null) {
-                        viewModel.addRecipe(recipe)
+                        viewModel.addRecipe(
+                            title = title,
+                            description = description,
+                            image = imageUri?.toString(),
+                            prepTime = prepTime.toIntOrNull() ?: 0,
+                            cookTime = cookTime.toIntOrNull() ?: 0,
+                            servings = servings.toIntOrNull() ?: 1,
+                            ingredients = ingredients.toList(),
+                            instructions = instructions.toList(),
+                            onSuccess = {
+                                isSaving = false
+                                onCreate()
+                            },
+                            onError = { e ->
+                                isSaving = false
+                                onError(e.message ?: "Failed to save recipe")
+                            }
+                        )
                     } else {
-                        viewModel.updateRecipe(recipe)
+                        viewModel.updateRecipe(
+                            id = recipeId,
+                            title = title,
+                            description = description,
+                            image = imageUri?.toString(),
+                            prepTime = prepTime.toIntOrNull() ?: 0,
+                            cookTime = cookTime.toIntOrNull() ?: 0,
+                            servings = servings.toIntOrNull() ?: 1,
+                            ingredients = ingredients.toList(),
+                            instructions = instructions.toList(),
+                            onSuccess = {
+                                isSaving = false
+                                onUpdate()
+                            },
+                            onError = { e ->
+                                isSaving = false
+                                onError(e.message ?: "Failed to update recipe")
+                            }
+                        )
                     }
-                    onCreate(recipe)
                 },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF08143)),
-                enabled = title.isNotBlank() && description.isNotBlank()
+                enabled = title.isNotBlank() && description.isNotBlank() && !isSaving
             ) {
-                Text(if (recipeId == null) "Create Recipe" else "Save Changes", color = Color.White)
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(if (recipeId == null) "Create Recipe" else "Save Changes", color = Color.White)
+                }
             }
         }
         
@@ -742,13 +851,35 @@ fun ProfileScreen(
     onLogout: () -> Unit = {},
     viewModel: BiteBookViewModel = viewModel()
 ) {
-    val userRecipes by viewModel.userRecipes.collectAsState()
+    val userRecipes = viewModel.userRecipes.collectAsLazyPagingItems()
     val userName by viewModel.userName.collectAsState()
+    val userEmail by viewModel.userEmail.collectAsState()
+    val accountUsername by viewModel.accountUsername.collectAsState()
     val profileImageUri by viewModel.profileImageUri.collectAsState()
     
+    val isUpdatingProfile by viewModel.isUpdatingProfile.collectAsState()
+
     var isEditingProfile by remember { mutableStateOf(false) }
-    var editedName by remember { mutableStateOf(userName) }
-    var editedImageUri by remember { mutableStateOf<Uri?>(profileImageUri?.let { Uri.parse(it) }) }
+    var editedName by remember(userName) { mutableStateOf(userName) }
+    var editedEmail by remember(userEmail) { mutableStateOf(userEmail) }
+    var editedImageUri by remember(profileImageUri) { mutableStateOf<Uri?>(profileImageUri?.let { Uri.parse(it) }) }
+
+    LaunchedEffect(Unit) {
+        viewModel.triggerRefresh()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.triggerRefresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val profileImagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -761,7 +892,9 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(Color(0xFFFAF9F6))
     ) {
+        // Top Profile Section
         Row(
+
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
@@ -769,6 +902,7 @@ fun ProfileScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Avatar
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -815,7 +949,15 @@ fun ProfileScreen(
                             value = editedName,
                             onValueChange = { editedName = it },
                             label = { Text("Name") },
-                            modifier = Modifier.width(150.dp),
+                            modifier = Modifier.width(200.dp),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = editedEmail,
+                            onValueChange = { editedEmail = it },
+                            label = { Text("Email") },
+                            modifier = Modifier.width(200.dp),
                             singleLine = true
                         )
                     } else {
@@ -824,9 +966,24 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
+                        if (accountUsername.isNotBlank()) {
+                            Text(
+                                text = "@$accountUsername",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFFF08143)
+                            )
+                        }
+                        if (userEmail.isNotBlank()) {
+                            Text(
+                                text = userEmail,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${userRecipes.size} recipes",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "${userRecipes.itemCount} recipes",
+                            style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray
                         )
                     }
@@ -835,21 +992,37 @@ fun ProfileScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isEditingProfile) {
-                    IconButton(onClick = {
-                        viewModel.updateProfile(editedName, editedImageUri?.toString())
-                        isEditingProfile = false
-                    }) {
-                        Icon(Icons.Default.Check, contentDescription = "Save", tint = Color(0xFF4CAF50))
-                    }
-                    IconButton(onClick = {
-                        isEditingProfile = false
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color(0xFFF44336))
+                    if (isUpdatingProfile) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color(0xFFF08143),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(onClick = {
+                            viewModel.updateProfile(
+                                editedName,
+                                editedEmail,
+                                editedImageUri?.toString(),
+                                onSuccess = { isEditingProfile = false }
+                            )
+                        }) {
+                            Icon(Icons.Default.Check, contentDescription = "Save", tint = Color(0xFF4CAF50))
+                        }
+                        IconButton(onClick = {
+                            isEditingProfile = false
+                            editedName = userName
+                            editedEmail = userEmail
+                            editedImageUri = profileImageUri?.let { Uri.parse(it) }
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color(0xFFF44336))
+                        }
                     }
                 } else {
                     IconButton(
                         onClick = { 
                             editedName = userName
+                            editedEmail = userEmail
                             editedImageUri = profileImageUri?.let { Uri.parse(it) }
                             isEditingProfile = true 
                         },
@@ -868,6 +1041,7 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
+                // Logout Button
                 IconButton(
                     onClick = onLogout,
                     modifier = Modifier
@@ -884,6 +1058,7 @@ fun ProfileScreen(
             }
         }
 
+        // "My Recipes" Title
         Text(
             text = "My Recipes",
             style = MaterialTheme.typography.headlineSmall,
@@ -896,13 +1071,20 @@ fun ProfileScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(userRecipes) { recipe ->
-                RecipeCard(
-                    recipe = recipe,
-                    onClick = { onRecipeClick(recipe.id) },
-                    onEdit = { onEditClick(recipe.id) },
-                    onDelete = { onDeleteClick(recipe.id) }
-                )
+            items(
+                count = userRecipes.itemCount,
+                key = userRecipes.itemKey { it._id },
+                contentType = userRecipes.itemContentType { "recipe" }
+            ) { index ->
+                val recipe = userRecipes[index]
+                if (recipe != null) {
+                    RecipeCard(
+                        recipe = recipe,
+                        onClick = { onRecipeClick(recipe._id) },
+                        onEdit = { onEditClick(recipe._id) },
+                        onDelete = { onDeleteClick(recipe._id) }
+                    )
+                }
             }
         }
     }
@@ -914,8 +1096,20 @@ fun RecipeDetailScreen(
     onBack: () -> Unit,
     viewModel: BiteBookViewModel = viewModel()
 ) {
-    val recipes by viewModel.recipes.collectAsState()
-    val recipe = recipes.find { it.id == recipeId } ?: return
+    androidx.compose.runtime.LaunchedEffect(recipeId) {
+        viewModel.getRecipeById(recipeId)
+    }
+
+    val recipe by viewModel.selectedRecipe.collectAsState()
+
+    if (recipe == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator(color = Color(0xFFF08143))
+        }
+        return
+    }
+
+    val nonNullRecipe = recipe!!
 
     Column(
         modifier = Modifier
@@ -923,15 +1117,17 @@ fun RecipeDetailScreen(
             .background(Color.White)
             .verticalScroll(rememberScrollState())
     ) {
+        // Image Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(300.dp)
         ) {
-            if (recipe.imageUrl != null) {
+            // Image
+            if (nonNullRecipe.image != null) {
                 AsyncImage(
-                    model = recipe.imageUrl,
-                    contentDescription = recipe.title,
+                    model = nonNullRecipe.image,
+                    contentDescription = nonNullRecipe.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
@@ -949,6 +1145,7 @@ fun RecipeDetailScreen(
                 }
             }
 
+            // Back Button
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
@@ -970,37 +1167,75 @@ fun RecipeDetailScreen(
                 .fillMaxWidth()
         ) {
             Text(
-                text = recipe.title,
+                text = nonNullRecipe.title,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
 
+            // Author Section
+            nonNullRecipe.author?.let { author ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF08143)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = author.name.firstOrNull()?.toString() ?: "",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "by ${author.name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Time and Servings
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Timer,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = Color(0xFFF08143)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = recipe.time, style = MaterialTheme.typography.bodyLarge)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Restaurant,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = Color(0xFFF08143)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "${recipe.servings} Servings", style = MaterialTheme.typography.bodyLarge)
+                // Time and Servings
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color(0xFFF08143)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${nonNullRecipe.prepTime + nonNullRecipe.cookTime} min",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Restaurant,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color(0xFFF08143)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${nonNullRecipe.servings} Servings",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
 
@@ -1013,7 +1248,7 @@ fun RecipeDetailScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = recipe.description,
+                text = nonNullRecipe.description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray,
                 lineHeight = 22.sp
@@ -1021,13 +1256,14 @@ fun RecipeDetailScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Ingredients
             Text(
                 text = "Ingredients",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(12.dp))
-            recipe.ingredients.forEach { (amount, name) ->
+            nonNullRecipe.ingredients.forEach { ingredient ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1041,7 +1277,7 @@ fun RecipeDetailScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "$amount $name",
+                        text = "${ingredient.amount} ${ingredient.name}",
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -1049,13 +1285,14 @@ fun RecipeDetailScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Instructions
             Text(
                 text = "Instructions",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(16.dp))
-            recipe.instructions.forEachIndexed { index, instruction ->
+            nonNullRecipe.instructions.forEachIndexed { index, instruction ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
